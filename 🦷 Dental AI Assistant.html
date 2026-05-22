@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dental AI Assistant — Помощник стоматолога</title>
+    <style>
+        :root {
+            --bg: #f5f7fa;
+            --card: #ffffff;
+            --text: #1f2937;
+            --accent: #059669;
+            --accent2: #2563eb;
+            --warn: #d97706;
+            --border: #d1d5db;
+            --radius: 12px;
+            --font: system-ui, -apple-system, sans-serif;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: var(--font);
+            background: var(--bg);
+            color: var(--text);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 1rem;
+        }
+        .container {
+            max-width: 700px;
+            width: 100%;
+            background: var(--card);
+            border-radius: var(--radius);
+            box-shadow: 0 4px 24px rgba(0,0,0,0.1);
+            padding: 2rem;
+        }
+        h1 {
+            font-size: 1.6rem;
+            color: var(--accent);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.2rem;
+        }
+        .subtitle {
+            font-size: 0.9rem;
+            color: #6b7280;
+            margin-bottom: 1.5rem;
+        }
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 0.3rem;
+            font-size: 0.9rem;
+        }
+        select, textarea, input[type="file"] {
+            width: 100%;
+            padding: 0.7rem;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 0.95rem;
+            margin-bottom: 1rem;
+            outline: none;
+            font-family: inherit;
+        }
+        select:focus, textarea:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(5,150,105,0.1);
+        }
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+        .btn {
+            display: inline-block;
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            padding: 0.7rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: filter 0.2s;
+            margin-right: 0.3rem;
+            margin-bottom: 0.5rem;
+        }
+        .btn:hover { filter: brightness(1.1); }
+        .btn.secondary {
+            background: #fff;
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+        .result-box {
+            background: #f0fdf4;
+            border: 1px solid var(--accent);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1rem;
+            font-family: monospace;
+            font-size: 0.9rem;
+            white-space: pre-wrap;
+            word-break: break-word;
+            min-height: 60px;
+        }
+        .file-info {
+            font-size: 0.8rem;
+            color: #6b7280;
+            margin-bottom: 0.5rem;
+        }
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: var(--accent);
+            color: #fff;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-weight: 500;
+            z-index: 999;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+        .toast.show { opacity: 1; }
+        .disclaimer {
+            margin-top: 1.5rem;
+            font-size: 0.75rem;
+            color: #9ca3af;
+            border-top: 1px solid var(--border);
+            padding-top: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🦷 Dental AI Assistant</h1>
+        <div class="subtitle">Инструмент для врача — просто скажите, что нужно, и получите готовый промпт</div>
+
+        <label for="task">Тип задачи</label>
+        <select id="task">
+            <option value="optg">Анализ ОПТГ (ортопантомограммы)</option>
+            <option value="ct">Анализ КЛКТ (3D-снимка)</option>
+            <option value="periapical">Анализ прицельного снимка</option>
+            <option value="plan">Составить план лечения по снимку</option>
+            <option value="consent">Подготовить информированное добровольное согласие</option>
+            <option value="patient">Объяснить пациенту простым языком</option>
+            <option value="document">Создать шаблон документа (направление, выписка)</option>
+            <option value="custom">Другая задача (опишу в комментарии)</option>
+        </select>
+
+        <label for="comment">Дополнительный комментарий (необязательно)</label>
+        <textarea id="comment" rows="2" placeholder="Например: зуб 4.6, глубокая кариозная полость, жалобы на боль при накусывании..."></textarea>
+
+        <label for="fileInput">Прикрепить снимок (изображение, PDF) — необязательно</label>
+        <input type="file" id="fileInput" accept="image/*,.pdf,.dcm" multiple>
+        <div class="file-info" id="fileInfo"></div>
+
+        <button class="btn" onclick="generatePrompt()">⚡ Сгенерировать промпт</button>
+        <button class="btn secondary" onclick="copyPrompt()">📋 Копировать</button>
+        <button class="btn secondary" onclick="saveToArchive()">💾 Сохранить в архив</button>
+
+        <div class="result-box" id="output">Здесь появится готовый промпт...</div>
+
+        <div class="disclaimer">
+            ⚠️ Этот инструмент генерирует промпт (текстовую инструкцию) для нейросети. Он не ставит диагноз и не анализирует снимки автоматически. Ответственность за диагностику всегда лежит на враче. Для использования скопируйте промпт и отправьте его в ChatGPT, Claude или другую AI-систему, прикрепив ваши снимки.
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        const taskDescriptions = {
+            optg: 'Перед тобой ортопантомограмма (панорамный снимок зубов). Проанализируй её: состояние всех зубов, наличие кариеса, пломб, коронок, мостов, имплантатов, уровень костной ткани, состояние гайморовых пазух и нижнечелюстного канала. Опиши патологии и дай рекомендации.',
+            ct: 'Перед тобой КЛКТ (конусно-лучевая компьютерная томограмма) челюстно-лицевой области. Проведи детальный анализ: состояние каждого зуба, эндодонтические проблемы, ретинированные зубы, патологии костной ткани, новообразования, состояние верхнечелюстных пазух и ВНЧС. Дай заключение в виде структурированного отчёта.',
+            periapical: 'Перед тобой прицельный рентгеновский снимок зуба. Опиши состояние коронки, корней, периапикальных тканей, наличие кариеса, реставраций, качество пломбирования каналов (если есть). Дай заключение и рекомендации.',
+            plan: 'На основе предоставленного снимка (или описания) составь подробный план лечения. Укажи этапы, необходимые процедуры, примерные сроки и прогноз. Учти возможные альтернативы.',
+            consent: 'Составь текст информированного добровольного согласия на медицинское вмешательство по шаблону Минздрава РФ для следующей процедуры: (опишу в комментарии). Включи риски, альтернативы и последствия отказа.',
+            patient: 'Объясни пациенту простым, понятным языком, что показывает его снимок и какое лечение рекомендуется. Избегай сложных медицинских терминов. Текст должен успокаивать и информировать.',
+            document: 'Создай шаблон медицинского документа: направление на КЛКТ / выписка из амбулаторной карты / рецепт. Используй стандартную форму, принятую в РФ. Заполни поля на основе комментария.',
+            custom: 'Пользователь описал свою задачу в комментарии. Создай оптимальный промпт для её решения. Учти, что пользователь — стоматолог, и ему нужно проанализировать снимок или подготовить документ.'
+        };
+
+        function generatePrompt() {
+            const task = document.getElementById('task').value;
+            const comment = document.getElementById('comment').value.trim();
+            const fileInput = document.getElementById('fileInput');
+            const output = document.getElementById('output');
+            const fileInfo = document.getElementById('fileInfo');
+
+            let prompt = '';
+            prompt += '=== ИНСТРУКЦИЯ ДЛЯ AI-АССИСТЕНТА ===\n\n';
+            prompt += 'Ты — опытный врач-стоматолог, специализирующийся на диагностике и лечении зубов. ';
+            prompt += 'Твоя задача — помочь коллеге проанализировать медицинские данные.\n\n';
+
+            prompt += `ЗАДАЧА: ${taskDescriptions[task]}\n\n`;
+
+            if (comment) {
+                prompt += `ДОПОЛНИТЕЛЬНАЯ ИНФОРМАЦИЯ ОТ ВРАЧА:\n${comment}\n\n`;
+            }
+
+            if (fileInput.files.length > 0) {
+                prompt += `К этому промпту прикреплены файлы (${fileInput.files.length} шт.):\n`;
+                for (let f of fileInput.files) {
+                    prompt += `- ${f.name}\n`;
+                }
+                prompt += '\nВНИМАНИЕ: для анализа снимков используй мультимодальную модель (GPT-4V, Claude 3.5 Sonnet, Gemini Pro Vision) или специализированное ПО (Diagnocat, Planmeca Romexis).\n\n';
+                fileInfo.textContent = `Прикреплено файлов: ${fileInput.files.length}`;
+            } else {
+                prompt += 'Снимки не прикреплены. Если необходимо, приложи их к этому промпту при отправке.\n\n';
+                fileInfo.textContent = 'Файлы не выбраны';
+            }
+
+            prompt += 'ФОРМАТ ОТВЕТА:\n';
+            prompt += '- Структурированный отчёт (если требуется)\n';
+            prompt += '- Чёткие, конкретные формулировки\n';
+            prompt += '- При наличии патологий — рекомендации по дальнейшим действиям\n';
+            prompt += '- Язык: русский\n\n';
+
+            prompt += 'ДИСКЛЕЙМЕР: Это заключение носит справочный характер. Окончательный диагноз ставит лечащий врач.';
+
+            output.textContent = prompt;
+        }
+
+        function copyPrompt() {
+            const text = document.getElementById('output').textContent;
+            if (!text || text.includes('появится')) {
+                alert('Сначала сгенерируйте промпт');
+                return;
+            }
+            navigator.clipboard.writeText(text).then(() => showToast('✅ Скопировано в буфер'));
+        }
+
+        function saveToArchive() {
+            const text = document.getElementById('output').textContent;
+            if (!text || text.includes('появится')) return;
+            const archive = JSON.parse(localStorage.getItem('dental_archive') || '[]');
+            archive.unshift({
+                task: document.getElementById('task').value,
+                comment: document.getElementById('comment').value,
+                prompt: text,
+                date: new Date().toISOString()
+            });
+            if (archive.length > 20) archive.length = 20;
+            localStorage.setItem('dental_archive', JSON.stringify(archive));
+            showToast('💾 Сохранено в архив (хранится локально)');
+        }
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 2200);
+        }
+    </script>
+</body>
+</html>
